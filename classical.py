@@ -1,9 +1,8 @@
 from collections import defaultdict
 
 
-@staticmethod
 def normalize_text(text):
-    return ''.join([c for c in text.upper() if c.isalpha()])
+    return ''.join(c for c in text.upper() if c.isalpha())
 
 
 def caesar_encrypt(text, shift):
@@ -46,7 +45,7 @@ def kasiski(text, seq_len=3):
     text = normalize_text(text)
     positions = defaultdict(list)
 
-    for i in range(len(text) - seq_len):
+    for i in range(len(text) - seq_len + 1):
         seq = text[i:i + seq_len]
         positions[seq].append(i)
 

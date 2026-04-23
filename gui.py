@@ -2,29 +2,36 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
 from utils import measure_time
-from classical import caesar_encrypt, caesar_decrypt, vigenere_encrypt, vigenere_decrypt
-from math_crypto import sieve
-from public_key import rsa_encrypt, rsa_decrypt
+from classical import caesar_encrypt, caesar_decrypt, vigenere_encrypt, vigenere_decrypt, kasiski
+from math_crypto import sieve, egcd, modinv, lcg, miller_rabin
+from public_key import (
+    rsa_encrypt,
+    rsa_decrypt,
+    elgamal_encrypt,
+    elgamal_decrypt,
+    diffie_hellman,
+    shamir_encrypt,
+)
 from hash_sign import simple_hash
 from block_cipher import feistel_encrypt, feistel_decrypt
 
 # ── Palette ────────────────────────────────────────────────────────────────────
-BG        = "#0f1117"
-SURFACE   = "#1a1d27"
-SURFACE2  = "#232638"
-ACCENT    = "#6c63ff"
-ACCENT2   = "#a78bfa"
-TEXT      = "#e8e8f0"
-TEXT_DIM  = "#7a7a9a"
-SUCCESS   = "#4ade80"
-ERROR     = "#f87171"
-BORDER    = "#2e3150"
+BG = "#0f1117"
+SURFACE = "#1a1d27"
+SURFACE2 = "#232638"
+ACCENT = "#6c63ff"
+ACCENT2 = "#a78bfa"
+TEXT = "#e8e8f0"
+TEXT_DIM = "#7a7a9a"
+SUCCESS = "#4ade80"
+ERROR = "#f87171"
+BORDER = "#2e3150"
 
-FONT_TITLE  = ("Consolas", 13, "bold")
-FONT_MONO   = ("Consolas", 11)
-FONT_SMALL  = ("Consolas", 9)
-FONT_LABEL  = ("Segoe UI", 10)
-FONT_BTN    = ("Segoe UI", 10, "bold")
+FONT_TITLE = ("Consolas", 13, "bold")
+FONT_MONO = ("Consolas", 11)
+FONT_SMALL = ("Consolas", 9)
+FONT_LABEL = ("Segoe UI", 10)
+FONT_BTN = ("Segoe UI", 10, "bold")
 
 
 def apply_theme(root: tk.Tk):
@@ -33,95 +40,121 @@ def apply_theme(root: tk.Tk):
     style = ttk.Style(root)
     style.theme_use("clam")
 
-    # ── Notebook ───────────────────────────────────────────────────────────────
-    style.configure("TNotebook",
-                    background=BG,
-                    borderwidth=0,
-                    tabmargins=[0, 0, 0, 0])
-    style.configure("TNotebook.Tab",
-                    background=SURFACE,
-                    foreground=TEXT_DIM,
-                    font=FONT_BTN,
-                    padding=[18, 9],
-                    borderwidth=0,
-                    focuscolor=ACCENT)
-    style.map("TNotebook.Tab",
-              background=[("selected", SURFACE2)],
-              foreground=[("selected", ACCENT2)])
+    style.configure(
+        "TNotebook",
+        background=BG,
+        borderwidth=0,
+        tabmargins=[0, 0, 0, 0],
+    )
+    style.configure(
+        "TNotebook.Tab",
+        background=SURFACE,
+        foreground=TEXT_DIM,
+        font=FONT_BTN,
+        padding=[18, 9],
+        borderwidth=0,
+        focuscolor=ACCENT,
+    )
+    style.map(
+        "TNotebook.Tab",
+        background=[("selected", SURFACE2)],
+        foreground=[("selected", ACCENT2)],
+    )
 
-    # ── Frame ──────────────────────────────────────────────────────────────────
     style.configure("TFrame", background=BG)
     style.configure("Card.TFrame", background=SURFACE, relief="flat")
     style.configure("Inner.TFrame", background=SURFACE2, relief="flat")
 
-    # ── Label ──────────────────────────────────────────────────────────────────
-    style.configure("TLabel",
-                    background=BG,
-                    foreground=TEXT,
-                    font=FONT_LABEL)
-    style.configure("Dim.TLabel",
-                    background=SURFACE,
-                    foreground=TEXT_DIM,
-                    font=FONT_SMALL)
-    style.configure("Section.TLabel",
-                    background=SURFACE,
-                    foreground=ACCENT2,
-                    font=("Segoe UI", 9, "bold"))
-    style.configure("Time.TLabel",
-                    background=BG,
-                    foreground=SUCCESS,
-                    font=FONT_SMALL)
-    style.configure("Title.TLabel",
-                    background=BG,
-                    foreground=TEXT,
-                    font=FONT_TITLE)
+    style.configure(
+        "TLabel",
+        background=BG,
+        foreground=TEXT,
+        font=FONT_LABEL,
+    )
+    style.configure(
+        "Dim.TLabel",
+        background=SURFACE,
+        foreground=TEXT_DIM,
+        font=FONT_SMALL,
+    )
+    style.configure(
+        "Section.TLabel",
+        background=SURFACE,
+        foreground=ACCENT2,
+        font=("Segoe UI", 9, "bold"),
+    )
+    style.configure(
+        "Time.TLabel",
+        background=BG,
+        foreground=SUCCESS,
+        font=FONT_SMALL,
+    )
+    style.configure(
+        "Title.TLabel",
+        background=BG,
+        foreground=TEXT,
+        font=FONT_TITLE,
+    )
 
-    # ── Entry ──────────────────────────────────────────────────────────────────
-    style.configure("TEntry",
-                    fieldbackground=SURFACE2,
-                    foreground=TEXT,
-                    insertcolor=ACCENT2,
-                    borderwidth=1,
-                    relief="flat",
-                    font=FONT_MONO)
-    style.map("TEntry",
-              fieldbackground=[("focus", SURFACE2)],
-              bordercolor=[("focus", ACCENT)])
+    style.configure(
+        "TEntry",
+        fieldbackground=SURFACE2,
+        foreground=TEXT,
+        insertcolor=ACCENT2,
+        borderwidth=1,
+        relief="flat",
+        font=FONT_MONO,
+    )
+    style.map(
+        "TEntry",
+        fieldbackground=[("focus", SURFACE2)],
+        bordercolor=[("focus", ACCENT)],
+    )
 
-    # ── Separator ─────────────────────────────────────────────────────────────
     style.configure("TSeparator", background=BORDER)
 
-    # ── Scrollbar ─────────────────────────────────────────────────────────────
-    style.configure("TScrollbar",
-                    background=SURFACE2,
-                    troughcolor=SURFACE,
-                    arrowcolor=TEXT_DIM,
-                    borderwidth=0,
-                    relief="flat")
-    style.map("TScrollbar",
-              background=[("active", BORDER)],
-              arrowcolor=[("active", ACCENT2)])
+    style.configure(
+        "TScrollbar",
+        background=SURFACE2,
+        troughcolor=SURFACE,
+        arrowcolor=TEXT_DIM,
+        borderwidth=0,
+        relief="flat",
+    )
+    style.map(
+        "TScrollbar",
+        background=[("active", BORDER)],
+        arrowcolor=[("active", ACCENT2)],
+    )
 
 
 def make_text_widget(parent, height=5, placeholder=""):
-    frame = tk.Frame(parent, bg=SURFACE2, bd=0, highlightthickness=1,
-                     highlightbackground=BORDER, highlightcolor=ACCENT)
+    frame = tk.Frame(
+        parent,
+        bg=SURFACE2,
+        bd=0,
+        highlightthickness=1,
+        highlightbackground=BORDER,
+        highlightcolor=ACCENT,
+    )
     frame.pack(fill="x", pady=(0, 2))
 
-    text = tk.Text(frame,
-                   height=height,
-                   bg=SURFACE2,
-                   fg=TEXT,
-                   insertbackground=ACCENT2,
-                   selectbackground=ACCENT,
-                   selectforeground=TEXT,
-                   font=FONT_MONO,
-                   bd=0,
-                   padx=10,
-                   pady=8,
-                   wrap="word",
-                   relief="flat",
-                   undo=True)
+    text = tk.Text(
+        frame,
+        height=height,
+        bg=SURFACE2,
+        fg=TEXT,
+        insertbackground=ACCENT2,
+        selectbackground=ACCENT,
+        selectforeground=TEXT,
+        font=FONT_MONO,
+        bd=0,
+        padx=10,
+        pady=8,
+        wrap="word",
+        relief="flat",
+        undo=True,
+    )
 
     sb = ttk.Scrollbar(frame, orient="vertical", command=text.yview)
     text.configure(yscrollcommand=sb.set)
@@ -149,19 +182,27 @@ def make_text_widget(parent, height=5, placeholder=""):
 
 
 def make_entry(parent, placeholder=""):
-    frame = tk.Frame(parent, bg=SURFACE2, bd=0, highlightthickness=1,
-                     highlightbackground=BORDER, highlightcolor=ACCENT)
+    frame = tk.Frame(
+        parent,
+        bg=SURFACE2,
+        bd=0,
+        highlightthickness=1,
+        highlightbackground=BORDER,
+        highlightcolor=ACCENT,
+    )
     frame.pack(fill="x", pady=(0, 2))
 
-    entry = tk.Entry(frame,
-                     bg=SURFACE2,
-                     fg=TEXT,
-                     insertbackground=ACCENT2,
-                     selectbackground=ACCENT,
-                     selectforeground=TEXT,
-                     font=FONT_MONO,
-                     bd=0,
-                     relief="flat")
+    entry = tk.Entry(
+        frame,
+        bg=SURFACE2,
+        fg=TEXT,
+        insertbackground=ACCENT2,
+        selectbackground=ACCENT,
+        selectforeground=TEXT,
+        font=FONT_MONO,
+        bd=0,
+        relief="flat",
+    )
     entry.pack(fill="x", padx=10, pady=8)
 
     if placeholder:
@@ -186,28 +227,33 @@ def make_entry(parent, placeholder=""):
 
 def make_button(parent, text, command, style="primary"):
     colors = {
-        "primary":  (ACCENT,   TEXT),
-        "secondary":(SURFACE2, TEXT_DIM),
-        "ghost":    (SURFACE,  TEXT_DIM),
+        "primary": (ACCENT, TEXT),
+        "secondary": (SURFACE2, TEXT_DIM),
+        "ghost": (SURFACE, TEXT_DIM),
     }
     bg_c, fg_c = colors.get(style, colors["primary"])
 
-    btn = tk.Button(parent,
-                    text=text,
-                    command=command,
-                    bg=bg_c,
-                    fg=fg_c,
-                    activebackground=ACCENT2,
-                    activeforeground=TEXT,
-                    font=FONT_BTN,
-                    bd=0,
-                    relief="flat",
-                    padx=18,
-                    pady=8,
-                    cursor="hand2")
+    btn = tk.Button(
+        parent,
+        text=text,
+        command=command,
+        bg=bg_c,
+        fg=fg_c,
+        activebackground=ACCENT2,
+        activeforeground=TEXT,
+        font=FONT_BTN,
+        bd=0,
+        relief="flat",
+        padx=18,
+        pady=8,
+        cursor="hand2",
+    )
 
-    def on_enter(e): btn.config(bg=ACCENT2 if style == "primary" else BORDER)
-    def on_leave(e): btn.config(bg=bg_c)
+    def on_enter(e):
+        btn.config(bg=ACCENT2 if style == "primary" else BORDER)
+
+    def on_leave(e):
+        btn.config(bg=bg_c)
 
     btn.bind("<Enter>", on_enter)
     btn.bind("<Leave>", on_leave)
@@ -216,7 +262,15 @@ def make_button(parent, text, command, style="primary"):
 
 def section_label(parent, text):
     ttk.Label(parent, text=text.upper(), style="Section.TLabel").pack(
-        anchor="w", pady=(10, 3))
+        anchor="w", pady=(10, 3)
+    )
+
+
+def parse_int_list(text: str, expected: int | None = None) -> list[int]:
+    values = [int(x.strip()) for x in text.split(",") if x.strip()]
+    if expected is not None and len(values) < expected:
+        raise ValueError(f"Expected at least {expected} integers separated by commas")
+    return values
 
 
 class App:
@@ -227,21 +281,27 @@ class App:
         self.root.minsize(780, 560)
         apply_theme(root)
 
-        # ── Header ────────────────────────────────────────────────────────────
         header = tk.Frame(root, bg=SURFACE, height=54)
         header.pack(fill="x")
         header.pack_propagate(False)
 
-        tk.Label(header, text="⬡  ШИФР-БЛОКНОТ",
-                 bg=SURFACE, fg=ACCENT2,
-                 font=FONT_TITLE).pack(side="left", padx=22, pady=14)
+        tk.Label(
+            header,
+            text="⬡  ШИФР-БЛОКНОТ",
+            bg=SURFACE,
+            fg=ACCENT2,
+            font=FONT_TITLE,
+        ).pack(side="left", padx=22, pady=14)
 
         self._status_var = tk.StringVar(value="Готов")
-        tk.Label(header, textvariable=self._status_var,
-                 bg=SURFACE, fg=TEXT_DIM,
-                 font=FONT_SMALL).pack(side="right", padx=22)
+        tk.Label(
+            header,
+            textvariable=self._status_var,
+            bg=SURFACE,
+            fg=TEXT_DIM,
+            font=FONT_SMALL,
+        ).pack(side="right", padx=22)
 
-        # ── Notebook ──────────────────────────────────────────────────────────
         nb_wrap = tk.Frame(root, bg=BG)
         nb_wrap.pack(fill="both", expand=True, padx=0, pady=0)
 
@@ -254,18 +314,19 @@ class App:
         self.create_hash_tab()
         self.create_block_tab()
 
-        # ── Status bar ────────────────────────────────────────────────────────
         bar = tk.Frame(root, bg=SURFACE, height=28)
         bar.pack(fill="x", side="bottom")
         bar.pack_propagate(False)
         self._time_var = tk.StringVar(value="")
-        tk.Label(bar, textvariable=self._time_var,
-                 bg=SURFACE, fg=SUCCESS,
-                 font=FONT_SMALL).pack(side="right", padx=16)
+        tk.Label(
+            bar,
+            textvariable=self._time_var,
+            bg=SURFACE,
+            fg=SUCCESS,
+            font=FONT_SMALL,
+        ).pack(side="right", padx=16)
 
-    # ── Generic tab builder ────────────────────────────────────────────────────
     def _tab_frame(self, title: str):
-        """Creates a scrollable card inside a new notebook tab."""
         outer = ttk.Frame(self.notebook)
         self.notebook.add(outer, text=title)
 
@@ -287,68 +348,53 @@ class App:
         canvas.bind("<Configure>", on_resize)
         card.bind("<Configure>", on_configure)
 
-        # Mousewheel scroll
         def _scroll(e):
             canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
+
         canvas.bind_all("<MouseWheel>", _scroll)
 
         return card
 
     def _build_io(self, card, input_placeholder="Введите текст…", key_hint=""):
-        """Returns (input_text, key_entry, result_text)."""
-
-        # Input block
         section_label(card, "Входные данные")
-        input_text = make_text_widget(card, height=4,
-                                      placeholder=input_placeholder)
+        input_text = make_text_widget(card, height=4, placeholder=input_placeholder)
 
         btn_row = tk.Frame(card, bg=SURFACE)
         btn_row.pack(fill="x", pady=(4, 10))
-        make_button(btn_row, "📂  Загрузить файл",
-                    lambda: self._load_file(input_text),
-                    style="ghost").pack(side="left")
+        make_button(
+            btn_row,
+            "📂  Загрузить файл",
+            lambda: self._load_file(input_text),
+            style="ghost",
+        ).pack(side="left")
 
-        # Key block
         section_label(card, "Ключ" + (f"  —  {key_hint}" if key_hint else ""))
         key_entry = make_entry(card, placeholder=key_hint or "Введите ключ…")
 
-        # Result block
         section_label(card, "Результат")
         result_text = make_text_widget(card, height=4)
         result_text.config(state="disabled")
 
         save_row = tk.Frame(card, bg=SURFACE)
         save_row.pack(fill="x", pady=(4, 6))
-        make_button(save_row, "💾  Сохранить результат",
-                    lambda: self._save_file(result_text),
-                    style="ghost").pack(side="left")
+        make_button(
+            save_row,
+            "💾  Сохранить результат",
+            lambda: self._save_file(result_text),
+            style="ghost",
+        ).pack(side="left")
 
         return input_text, key_entry, result_text
 
-    def _btn_row(self, card, pairs):
-        """pairs = [(label, func, args_getter), ...]"""
-        row = tk.Frame(card, bg=SURFACE)
-        row.pack(fill="x", pady=(12, 4))
-        for i, (label, func, args_fn) in enumerate(pairs):
-            style = "primary" if i % 2 == 0 else "secondary"
-            b = make_button(row, label,
-                            lambda f=func, a=args_fn: self._run(f, a()),
-                            style=style)
-            b.pack(side="left", padx=(0, 8))
-        return row
-
-    # ── Runner ────────────────────────────────────────────────────────────────
-    def _run(self, func, args):
+    def _run(self, func, args, result_widget):
         try:
             wrapped = measure_time(func)
             res, t = wrapped(*args)
-            self._last_result = res
 
-            # Update result widget (find it)
-            self._current_result.config(state="normal")
-            self._current_result.delete("1.0", tk.END)
-            self._current_result.insert(tk.END, str(res))
-            self._current_result.config(state="disabled")
+            result_widget.config(state="normal")
+            result_widget.delete("1.0", tk.END)
+            result_widget.insert(tk.END, str(res))
+            result_widget.config(state="disabled")
 
             self._time_var.set(f"⏱  {t}s")
             self._status_var.set("✔  Готово")
@@ -356,147 +402,299 @@ class App:
             messagebox.showerror("Ошибка", str(e))
             self._status_var.set("✖  Ошибка")
 
-    # ── Tabs ──────────────────────────────────────────────────────────────────
+    def _make_action(self, func, args_fn, result_widget):
+        def action():
+            self._run(func, args_fn(), result_widget)
+
+        return action
+
     def create_classical_tab(self):
         card = self._tab_frame("🔤  Классические")
-        inp, key, res = self._build_io(card,
-                                       key_hint="Цезарь: число / Виженер: слово")
-        self._classical_res = res
+        inp, key, res = self._build_io(
+            card,
+            key_hint="Цезарь: число / Виженер: слово / Касиски: длина",
+        )
 
         section_label(card, "Операции")
         ops = [
-            ("Цезарь  🔒  Encrypt", caesar_encrypt,
-             lambda: (inp.get("1.0", tk.END).strip(), int(key.get()))),
-            ("Цезарь  🔓  Decrypt", caesar_decrypt,
-             lambda: (inp.get("1.0", tk.END).strip(), int(key.get()))),
-            ("Виженер  🔒  Encrypt", vigenere_encrypt,
-             lambda: (inp.get("1.0", tk.END).strip(), key.get().strip())),
-            ("Виженер  🔓  Decrypt", vigenere_decrypt,
-             lambda: (inp.get("1.0", tk.END).strip(), key.get().strip())),
+            (
+                "Цезарь  🔒  Encrypt",
+                caesar_encrypt,
+                lambda: (inp.get("1.0", tk.END).strip(), int(key.get())),
+            ),
+            (
+                "Цезарь  🔓  Decrypt",
+                caesar_decrypt,
+                lambda: (inp.get("1.0", tk.END).strip(), int(key.get())),
+            ),
+            (
+                "Виженер  🔒  Encrypt",
+                vigenere_encrypt,
+                lambda: (inp.get("1.0", tk.END).strip(), key.get().strip()),
+            ),
+            (
+                "Виженер  🔓  Decrypt",
+                vigenere_decrypt,
+                lambda: (inp.get("1.0", tk.END).strip(), key.get().strip()),
+            ),
         ]
+
         row1 = tk.Frame(card, bg=SURFACE)
         row1.pack(fill="x", pady=(8, 4))
         row2 = tk.Frame(card, bg=SURFACE)
         row2.pack(fill="x", pady=(0, 4))
+
         for i, (label, func, args_fn) in enumerate(ops):
             target = row1 if i < 2 else row2
-            b = make_button(target, label,
-                            self._make_action(func, args_fn, res),
-                            style="primary" if i % 2 == 0 else "secondary")
+            b = make_button(
+                target,
+                label,
+                self._make_action(func, args_fn, res),
+                style="primary" if i % 2 == 0 else "secondary",
+            )
             b.pack(side="left", padx=(0, 8), pady=2)
+
+        section_label(card, "Криптоанализ")
+        tk.Label(
+            card,
+            text="Метод Касиски: ищет повторяющиеся последовательности и расстояния между ними.",
+            bg=SURFACE,
+            fg=TEXT_DIM,
+            font=FONT_SMALL,
+        ).pack(anchor="w", pady=(0, 8))
+
+        make_button(
+            card,
+            "Касиски",
+            self._make_action(
+                lambda text, seq_len: kasiski(text, seq_len),
+                lambda: (inp.get("1.0", tk.END).strip(), int(key.get())),
+                res,
+            ),
+            style="ghost",
+        ).pack(anchor="w")
 
     def create_math_tab(self):
         card = self._tab_frame("🔢  Математика")
-        inp, key, res = self._build_io(card, key_hint="Верхняя граница N")
+        inp, key, res = self._build_io(card, key_hint="N / параметры")
 
         section_label(card, "Решето Эратосфена")
-        tk.Label(card,
-                 text="Находит все простые числа до N. Ключ — это и есть N.",
-                 bg=SURFACE, fg=TEXT_DIM,
-                 font=FONT_SMALL).pack(anchor="w", pady=(0, 8))
+        make_button(
+            card,
+            "Запустить решето",
+            self._make_action(sieve, lambda: (int(key.get().strip()),), res),
+            style="primary",
+        ).pack(anchor="w", pady=(0, 8))
 
-        row = tk.Frame(card, bg=SURFACE)
-        row.pack(fill="x", pady=(4, 4))
-        make_button(row, "▶  Запустить решето",
-                    self._make_action(sieve, lambda: (int(key.get().strip()),), res),
-                    style="primary").pack(side="left")
+        section_label(card, "Расширенный алгоритм Евклида")
+        make_button(
+            card,
+            "egcd(a, b)",
+            self._make_action(
+                egcd, lambda: tuple(parse_int_list(key.get(), expected=2)[:2]), res
+            ),
+            style="secondary",
+        ).pack(anchor="w", pady=(0, 8))
+
+        section_label(card, "Инверсия по модулю m")
+        make_button(
+            card,
+            "modinv(a, m)",
+            self._make_action(
+                modinv, lambda: tuple(parse_int_list(key.get(), expected=2)[:2]), res
+            ),
+            style="ghost",
+        ).pack(anchor="w", pady=(0, 8))
+
+        section_label(card, "Генерация псевдослучайных чисел")
+        make_button(
+            card,
+            "LCG",
+            self._make_action(
+                lambda seed: [next(lcg(seed)) for _ in range(10)],
+                lambda: (int(key.get().strip()),),
+                res,
+            ),
+            style="primary",
+        ).pack(anchor="w", pady=(0, 8))
+
+        section_label(card, "Тест Миллера – Рабина")
+        make_button(
+            card,
+            "Проверить простоту",
+            self._make_action(miller_rabin, lambda: (int(key.get().strip()),), res),
+            style="secondary",
+        ).pack(anchor="w", pady=(0, 8))
 
     def create_public_key_tab(self):
         card = self._tab_frame("🔑  Открытый ключ")
         inp, key, res = self._build_io(
             card,
             input_placeholder="Введите число…",
-            key_hint="e,n  или  d,n")
+            key_hint="RSA e,n | ElGamal p,g,y,k | DH p,g,a,b | Shamir p,ca,cb",
+        )
 
-        tk.Label(card,
-                 text="RSA: входные данные — целое число; ключ — два числа через запятую.",
-                 bg=SURFACE, fg=TEXT_DIM,
-                 font=FONT_SMALL).pack(anchor="w", pady=(0, 8))
+        section_label(card, "Шифр RSA")
+        make_button(
+            card,
+            "RSA Encrypt",
+            self._make_action(
+                rsa_encrypt,
+                lambda: (
+                    int(inp.get("1.0", tk.END).strip()),
+                    tuple(parse_int_list(key.get(), expected=2)[:2]),
+                ),
+                res,
+            ),
+            style="primary",
+        ).pack(anchor="w", pady=(0, 4))
+        make_button(
+            card,
+            "RSA Decrypt",
+            self._make_action(
+                rsa_decrypt,
+                lambda: (
+                    int(inp.get("1.0", tk.END).strip()),
+                    tuple(parse_int_list(key.get(), expected=2)[:2]),
+                ),
+                res,
+            ),
+            style="secondary",
+        ).pack(anchor="w", pady=(0, 8))
 
-        row = tk.Frame(card, bg=SURFACE)
-        row.pack(fill="x", pady=(4, 4))
-        make_button(row, "RSA  🔒  Encrypt",
-                    self._make_action(rsa_encrypt,
-                                      lambda: (int(inp.get("1.0", tk.END)),
-                                               tuple(map(int, key.get().split(",")))),
-                                      res),
-                    style="primary").pack(side="left", padx=(0, 8))
-        make_button(row, "RSA  🔓  Decrypt",
-                    self._make_action(rsa_decrypt,
-                                      lambda: (int(inp.get("1.0", tk.END)),
-                                               tuple(map(int, key.get().split(",")))),
-                                      res),
-                    style="secondary").pack(side="left")
+        section_label(card, "Алгоритм Шамира")
+        make_button(
+            card,
+            "Shamir",
+            self._make_action(
+                shamir_encrypt,
+                lambda: (
+                    int(inp.get("1.0", tk.END).strip()),
+                    *parse_int_list(key.get(), expected=3)[:3],
+                ),
+                res,
+            ),
+            style="ghost",
+        ).pack(anchor="w", pady=(0, 8))
+
+        section_label(card, "Шифр Эль-Гамаля")
+        make_button(
+            card,
+            "ElGamal Encrypt",
+            self._make_action(
+                elgamal_encrypt,
+                lambda: (
+                    int(inp.get("1.0", tk.END).strip()),
+                    *parse_int_list(key.get(), expected=4)[:4],
+                ),
+                res,
+            ),
+            style="primary",
+        ).pack(anchor="w", pady=(0, 4))
+
+        make_button(
+            card,
+            "ElGamal Decrypt",
+            self._make_action(
+                elgamal_decrypt,
+                lambda: (
+                    int(inp.get("1.0", tk.END).strip()),
+                    *parse_int_list(key.get(), expected=4)[:4],
+                ),
+                res,
+            ),
+            style="secondary",
+        ).pack(anchor="w", pady=(0, 8))
+
+        section_label(card, "Протокол Диффи–Хеллмана")
+        make_button(
+            card,
+            "Diffie–Hellman",
+            self._make_action(
+                diffie_hellman,
+                lambda: tuple(parse_int_list(key.get(), expected=4)[:4]),
+                res,
+            ),
+            style="ghost",
+        ).pack(anchor="w", pady=(0, 8))
 
     def create_hash_tab(self):
         card = self._tab_frame("🔐  Хеш / ЭЦП")
-        inp, key, res = self._build_io(card, input_placeholder="Введите текст для хеширования…")
+        inp, key, res = self._build_io(
+            card, input_placeholder="Введите текст для хеширования…"
+        )
 
-        tk.Label(card,
-                 text="Хеш-функции необратимы — дешифровка невозможна принципиально.",
-                 bg=SURFACE, fg=TEXT_DIM,
-                 font=FONT_SMALL).pack(anchor="w", pady=(0, 8))
+        tk.Label(
+            card,
+            text="Хеш-функции необратимы — дешифровка невозможна принципиально.",
+            bg=SURFACE,
+            fg=TEXT_DIM,
+            font=FONT_SMALL,
+        ).pack(anchor="w", pady=(0, 8))
 
         row = tk.Frame(card, bg=SURFACE)
         row.pack(fill="x", pady=(4, 4))
-        make_button(row, "#  Вычислить хеш",
-                    self._make_action(simple_hash,
-                                      lambda: (inp.get("1.0", tk.END).strip(),),
-                                      res),
-                    style="primary").pack(side="left")
+        make_button(
+            row,
+            "#  Вычислить хеш",
+            self._make_action(
+                simple_hash,
+                lambda: (inp.get("1.0", tk.END).strip(),),
+                res,
+            ),
+            style="primary",
+        ).pack(side="left")
 
     def create_block_tab(self):
         card = self._tab_frame("🧱  Блочные")
         inp, key, res = self._build_io(
             card,
             input_placeholder="Введите число…",
-            key_hint="k1,k2,k3,…")
+            key_hint="k1,k2,k3,…",
+        )
 
-        tk.Label(card,
-                 text="Сеть Фейстеля: входные данные — целое число; ключи — список через запятую.",
-                 bg=SURFACE, fg=TEXT_DIM,
-                 font=FONT_SMALL).pack(anchor="w", pady=(0, 8))
+        tk.Label(
+            card,
+            text="Сеть Фейстеля: входные данные — целое число; ключи — список через запятую.",
+            bg=SURFACE,
+            fg=TEXT_DIM,
+            font=FONT_SMALL,
+        ).pack(anchor="w", pady=(0, 8))
 
         row = tk.Frame(card, bg=SURFACE)
         row.pack(fill="x", pady=(4, 4))
-        make_button(row, "Feistel  🔒  Encrypt",
-                    self._make_action(feistel_encrypt,
-                                      lambda: (int(inp.get("1.0", tk.END)),
-                                               list(map(int, key.get().split(",")))),
-                                      res),
-                    style="primary").pack(side="left", padx=(0, 8))
-        make_button(row, "Feistel  🔓  Decrypt",
-                    self._make_action(feistel_decrypt,
-                                      lambda: (int(inp.get("1.0", tk.END)),
-                                               list(map(int, key.get().split(",")))),
-                                      res),
-                    style="secondary").pack(side="left")
-
-    # ── Helpers ───────────────────────────────────────────────────────────────
-    def _make_action(self, func, args_fn, result_widget):
-        """Returns a zero-arg callable that runs func and writes to result_widget."""
-        def action():
-            try:
-                args = args_fn()
-                wrapped = measure_time(func)
-                res, t = wrapped(*args)
-
-                result_widget.config(state="normal")
-                result_widget.delete("1.0", tk.END)
-                result_widget.insert(tk.END, str(res))
-                result_widget.config(state="disabled")
-
-                self._time_var.set(f"⏱  {t}s")
-                self._status_var.set("✔  Готово")
-            except Exception as e:
-                messagebox.showerror("Ошибка", str(e))
-                self._status_var.set("✖  Ошибка")
-        return action
+        make_button(
+            row,
+            "Feistel  🔒  Encrypt",
+            self._make_action(
+                feistel_encrypt,
+                lambda: (
+                    int(inp.get("1.0", tk.END).strip()),
+                    parse_int_list(key.get()),
+                ),
+                res,
+            ),
+            style="primary",
+        ).pack(side="left", padx=(0, 8))
+        make_button(
+            row,
+            "Feistel  🔓  Decrypt",
+            self._make_action(
+                feistel_decrypt,
+                lambda: (
+                    int(inp.get("1.0", tk.END).strip()),
+                    parse_int_list(key.get()),
+                ),
+                res,
+            ),
+            style="secondary",
+        ).pack(side="left")
 
     def _load_file(self, text_widget):
         try:
             path = filedialog.askopenfilename(
-                filetypes=[("Текстовые файлы", "*.txt"), ("Все файлы", "*.*")])
+                filetypes=[("Текстовые файлы", "*.txt"), ("Все файлы", "*.*")]
+            )
             if not path:
                 return
             with open(path, "r", encoding="utf-8") as f:
@@ -512,7 +710,8 @@ class App:
         try:
             path = filedialog.asksaveasfilename(
                 defaultextension=".txt",
-                filetypes=[("Текстовые файлы", "*.txt"), ("Все файлы", "*.*")])
+                filetypes=[("Текстовые файлы", "*.txt"), ("Все файлы", "*.*")]
+            )
             if not path:
                 return
             content = result_widget.get("1.0", tk.END)

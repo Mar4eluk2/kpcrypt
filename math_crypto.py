@@ -2,6 +2,9 @@ import random
 
 
 def sieve(n):
+    if n < 2:
+        return []
+
     primes = [True] * (n + 1)
     primes[0] = primes[1] = False
 
@@ -35,6 +38,10 @@ def lcg(seed, a=1103515245, c=12345, m=2**31):
 
 def miller_rabin(n, k=5):
     if n < 2:
+        return False
+    if n in (2, 3):
+        return True
+    if n % 2 == 0:
         return False
 
     d = n - 1
